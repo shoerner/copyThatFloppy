@@ -1,4 +1,7 @@
 copyThatFloppy
 ==============
 
-Script to grab the contents of a floppy disk and send it to a file. 
+Perl script that opens up a floppy device and copies its contents
+to a binary file for use later. 
+
+Requires root level permissions and Digest::MD5. 
