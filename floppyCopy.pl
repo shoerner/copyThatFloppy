@@ -3,12 +3,13 @@
 use strict;
 use warnings;
 use Digest::MD5;
+use Fcntl;
 
 $| = 1; #Sync writes.
 
 my $floppyIndex = 0;
 my $storageDir = '/home/'. $ENV{"USER"} . '/floppyStorage/';
-my $doMD5 = 0;
+my $doMD5 = 1;
 
 # Sub to copy that floppy
 sub doCopy
@@ -16,7 +17,7 @@ sub doCopy
 	my $floppyDigest = Digest::MD5->new if $doMD5 != 0;
 	# I have read that it is a simple cat to get the floppy drive moved
 	# So lets try to grab it using 'open'
-	open(my $floppyDrive, '<' , '/dev/fd0');
+	sysopen(my $floppyDrive, '/dev/sdb', O_RDONLY | O_BINARY) or die "Failed to open /dev/sdb: $!";
 
 	# Check to see if anticipated filename exists
 	my $filename =  $storageDir . "floppy$floppyIndex.bin";
@@ -90,16 +91,25 @@ sub doCopy
 sub senseFiles
 {
 	# Operational requirement: each floppy file will be named floppy[index].bin
-
-	opendir(DIR,$storageDir);
-	my @files = readdir(DIR);
-	closedir(DIR);
+	my @files = <*.bin>;
 
 	@files = sort @files;
 
+	if(scalar(@files) < 1)
+	{
+		return 0;
+	}
+	else
+	{
+		print "Files: " . scalar(@files);
+		foreach my $file(@files)
+		{
+			print $file . "\n";
+		}
+	}
+
 	# Filename we want is the last one plus one
 	my $lastFile = $files[-1];
-
 	# Remove everything not a number to get the final string
 	$lastFile =~ s/[^0-9]//g;
 
