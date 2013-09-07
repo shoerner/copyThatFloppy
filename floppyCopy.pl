@@ -10,17 +10,32 @@ $| = 1; #Sync writes.
 my $floppyIndex = 0;
 my $storageDir = '/home/'. $ENV{"USER"} . '/floppyStorage/';
 my $doMD5 = 1;
+my $debug = 0;
+
+# Since we are opening a device for reading
+if($> != 0)
+{
+	die "Execution requires root level permissions.\n";
+}
 
 # Sub to copy that floppy
 sub doCopy
 {
+	my $paddedFloppy = '';
 	my $floppyDigest = Digest::MD5->new if $doMD5 != 0;
 	# I have read that it is a simple cat to get the floppy drive moved
 	# So lets try to grab it using 'open'
 	sysopen(my $floppyDrive, '/dev/sdb', O_RDONLY | O_BINARY) or die "Failed to open /dev/sdb: $!";
 
+	# Create floppy index (Pad it if necessary)
+	
+	$floppyIndex < 10 ? $paddedFloppy = '0' . $floppyIndex : $paddedFloppy = $floppyIndex;
+
 	# Check to see if anticipated filename exists
-	my $filename =  $storageDir . "floppy$floppyIndex.bin";
+	my $filename =  $storageDir . "floppy$paddedFloppy.bin";
+
+	print "Now creating floppy image: $filename\t";
+
 	if(-e $filename)
 	{
 		print "File already exists. Overwrite? \n[Y/n]: ";
@@ -84,6 +99,12 @@ sub doCopy
 			# Re-run sub
 			doCopy();
 		}
+		else
+		{
+			print '< MD5 Check Matches > ';
+			print "[$floppyResult vs $outputResult]" if $debug != 0;
+			print "\n\n";
+		}
 	}
 }
 
@@ -91,30 +112,29 @@ sub doCopy
 sub senseFiles
 {
 	# Operational requirement: each floppy file will be named floppy[index].bin
+
+	# Glob the file directory
 	my @files = <*.bin>;
 
-	@files = sort @files;
+	# BUG: Linux sorts this automatically by virtue of the OS. Sorting results in double digit 
+	# files being missed in cases with greater than 10 files.
+	# Sort the array just in case
+	#@files = sort @files;
 
+	# Check to make sure there are files in the array
 	if(scalar(@files) < 1)
 	{
 		return 0;
 	}
-	else
-	{
-		print "Files: " . scalar(@files);
-		foreach my $file(@files)
-		{
-			print $file . "\n";
-		}
-	}
 
 	# Filename we want is the last one plus one
 	my $lastFile = $files[-1];
+
 	# Remove everything not a number to get the final string
 	$lastFile =~ s/[^0-9]//g;
 
 	# Add one for one more file and begin
-	$floppyIndex = $lastFile++;
+	$floppyIndex = ++$lastFile;
 
 	print "Scans show next file should be $floppyIndex\n\n";
 }
@@ -122,10 +142,16 @@ sub senseFiles
 # Sub for operator intervention
 sub doOperator
 {
-	print "Please insert floppy... <Ctrl-C to exit>";
-	my $nothingness = <>;
+	print "Please insert floppy... ['return' to start copy, 'q' to exit] ";
+	my $nothingness = <STDIN>;
 
-	print "Now creating floppy image: floppy$floppyIndex.bin\n";
+	chomp($nothingness);
+
+	if(lc($nothingness) eq 'q')
+	{
+		exit(0);
+	}
+
 	doCopy();
 
 	# Increment floppy count.
@@ -142,10 +168,10 @@ print "+------------------------------------------------------------------------
 print "| 							shoerner's \"Copy That Floppy\"							   |\n";
 print "+-------------------------------------------------------------------------------------+\n\n";
 
-print " Performing directory check to see if older files exist...\n";
+print "Performing directory check to see if older files exist...\n";
 senseFiles();
 
-print "Beginning copy loop. Press <Ctrl-C> to exit.\n\n";
+print "Beginning copy loop. \n\n";
 
 while(1)
 {
